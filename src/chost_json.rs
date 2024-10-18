@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_aux::prelude::deserialize_option_number_from_string;
 
@@ -25,9 +26,30 @@ pub(crate) struct AskSettings {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum Flag {
+	Staff,
+	StaffMember,
+	FriendOfTheSite,
+	NoTransparentAvatar,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum AvatarShape {
+	Circle,
+	Squircle,
+	Roundrect,
+	Egg,
+	CapsuleBig,
+	CapsuleSmall,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Privacy {
-	// Private,
+	None,
+	Private,
 	Public,
 	LoggedIn,
 }
@@ -59,9 +81,9 @@ pub(crate) struct PostingProject {
 	pub privacy: Privacy,
 	pub pronouns: String,
 	pub url: String,
-	pub flags: Vec<String>,
-	pub avatar_shape: String,
-	pub logged_out_post_visibility: String,
+	pub flags: Vec<Flag>,
+	pub avatar_shape: AvatarShape,
+	pub logged_out_post_visibility: Privacy,
 	pub ask_settings: AskSettings,
 	pub frequently_used_tags: Vec<String>,
 	pub contact_card: Vec<ContactCardEntry>,
@@ -128,7 +150,7 @@ pub(crate) struct Ask {
 	pub logged_in: bool,
 	pub asking_project: Option<AskingProject>,
 	pub content: String,
-	pub sent_at: String,
+	pub sent_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -145,7 +167,7 @@ pub(crate) enum Block {
 pub(crate) struct Chost {
 	pub post_id: u64,
 	pub headline: String,
-	pub published_at: String,
+	pub published_at: DateTime<Utc>,
 	pub filename: String,
 	pub transparent_share_of_post_id: Option<u64>,
 	pub share_of_post_id: Option<u64>,

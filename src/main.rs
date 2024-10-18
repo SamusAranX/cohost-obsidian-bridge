@@ -4,10 +4,11 @@ use crate::commands::{Cli, Commands};
 use clap::Parser;
 use std::process::ExitCode;
 
-mod cohost_json;
+mod chost_json;
 mod commands;
 mod cmd_likes;
 mod cmd_posts;
+mod chost_formatter;
 
 fn main() -> ExitCode {
 	let cli = Cli::parse();

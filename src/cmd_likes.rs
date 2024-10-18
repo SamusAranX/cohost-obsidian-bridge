@@ -1,4 +1,4 @@
-use crate::cohost_json::Chost;
+use crate::chost_json::Chost;
 use anyhow::Result;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -11,8 +11,7 @@ pub(crate) fn handle_likes<P: AsRef<Path>>(in_file: P, out_dir: P) -> Result<()>
 
 	for (i, line) in reader.lines().enumerate() {
 		let line = line?;
-		let chost: Chost = serde_json::from_str(&line)
-			.inspect_err(|e| eprintln!("Deserialization failed: {e:?}"))?;
+		let chost: Chost = serde_json::from_str(&line)?;
 		println!("[{:>03}] {} (@{})", i + 1, chost.filename, chost.posting_project.handle);
 	}
 
