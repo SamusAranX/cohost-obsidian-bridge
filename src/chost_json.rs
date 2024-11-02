@@ -88,12 +88,6 @@ pub(crate) struct PostingProject {
 	pub ask_settings: AskSettings,
 	pub frequently_used_tags: Vec<String>,
 	pub contact_card: Vec<ContactCardEntry>,
-
-	// only Option<> because of test data
-	// pub logged_out_post_visibility: Option<Privacy>,
-	// pub ask_settings: Option<AskSettings>,
-	// pub frequently_used_tags: Option<Vec<String>>,
-	// pub contact_card: Option<Vec<ContactCardEntry>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
