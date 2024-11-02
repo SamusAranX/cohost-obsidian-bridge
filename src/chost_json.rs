@@ -201,9 +201,3 @@ pub(crate) struct Chost {
 	#[serde(deserialize_with = "deserialize_option_number_from_string")]
 	pub response_to_ask_id: Option<u64>,
 }
-
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ChostContainerTest {
-	items: Vec<Chost>,
-}

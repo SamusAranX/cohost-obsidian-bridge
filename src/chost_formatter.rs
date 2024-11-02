@@ -4,15 +4,6 @@ use chrono::{Local, Locale};
 use indexmap::{indexset, IndexSet};
 use std::fmt::Write;
 
-// >[!cohost-share] Natalie
-// >@nex3 <time datetime="2024-09-23T04:25:43.380+02:00">Mon, Sep 23, 2024 at 4:25 AM</time> :LiRefreshCw: **Damien** @eramdam
-//
-// >[!cohost-post] jae
-// >@jkap <time datetime="2024-09-23T03:23:34.628+02:00">Mon, Sep 23, 2024 at 3:23 AM</time>
-//
-// >[!cohost-ask] [@TarotCard2](https://cohost.org/TarotCard2) asked:
-// >Are we allowed to use the colorscheme from here on cohost elsewhere? If so, what are the official hex codes?
-
 pub(crate) trait Renderable {
 	fn render<W: Write>(&self, receiver: &mut W) -> Result<()>;
 }
