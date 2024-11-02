@@ -1,5 +1,6 @@
 use crate::cmd_likes::handle_likes;
 use crate::cmd_posts::handle_posts;
+use crate::cmd_test::test_post;
 use crate::commands::{Cli, Commands};
 use clap::Parser;
 use std::process::ExitCode;
@@ -8,6 +9,7 @@ mod chost_json;
 mod commands;
 mod cmd_likes;
 mod cmd_posts;
+mod cmd_test;
 mod chost_formatter;
 
 fn main() -> ExitCode {
@@ -19,6 +21,9 @@ fn main() -> ExitCode {
 		}
 		Commands::Posts(args) => {
 			handle_posts(&args.input, &args.output)
+		}
+		Commands::Test(args) => {
+			test_post(&args.input)
 		}
 	};
 

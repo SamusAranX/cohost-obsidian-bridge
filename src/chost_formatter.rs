@@ -1,31 +1,224 @@
-use crate::chost_json::Chost;
+use crate::chost_json::{Ask, Attachment, Block, Chost, Markdown};
 use anyhow::Result;
-use chrono::Local;
+use chrono::{Local, Locale};
+use indexmap::{indexset, IndexSet};
 use std::fmt::Write;
 
-// ---
-// date: 2024-09-23T04:25:00
-// cohost/users:
-//   - nex3
-//   - eramdam
-//   - jkap
-//   - TarotCard2
-// cohost/tags:
-//   - ask jae anything
-// cohost/original-post: https://cohost.org/nex3/post/7807131-div-style-display
-// ---
+// >[!cohost-share] Natalie
+// >@nex3 <time datetime="2024-09-23T04:25:43.380+02:00">Mon, Sep 23, 2024 at 4:25 AM</time> :LiRefreshCw: **Damien** @eramdam
+//
+// >[!cohost-post] jae
+// >@jkap <time datetime="2024-09-23T03:23:34.628+02:00">Mon, Sep 23, 2024 at 3:23 AM</time>
+//
+// >[!cohost-ask] [@TarotCard2](https://cohost.org/TarotCard2) asked:
+// >Are we allowed to use the colorscheme from here on cohost elsewhere? If so, what are the official hex codes?
+
+pub(crate) trait Renderable {
+	fn render<W: Write>(&self, receiver: &mut W) -> Result<()>;
+}
+
+impl Renderable for Markdown {
+	fn render<W: Write>(&self, receiver: &mut W) -> Result<()> {
+		writeln!(receiver, "{}", self.content.trim())?;
+		Ok(())
+	}
+}
+
+impl Renderable for Attachment {
+	fn render<W: Write>(&self, receiver: &mut W) -> Result<()> {
+		match self {
+			Attachment::Image(image) => {
+				// ![Alt](/path/to/img.jpg "image title")
+				if let Some(alt_text) = &image.alt_text {
+					writeln!(receiver, "![{alt_text}]({})", image.file_url)?;
+				} else {
+					writeln!(receiver, "![]({})", image.file_url)?;
+				}
+			}
+			Attachment::Audio(audio) => {
+				writeln!(receiver, "<figure>")?;
+				writeln!(receiver, "\t<audio controls src=\"{}\"></audio>", audio.file_url)?;
+				writeln!(receiver, "\t<figcaption>")?;
+				writeln!(receiver, "\t\t<span>{}</span>", audio.title)?;
+				writeln!(receiver, "\t\t<small>{}</small>", audio.artist)?;
+				writeln!(receiver, "\t</figcaption>")?;
+				writeln!(receiver, "\t<a href=\"{}\">Direct Link</a>", audio.file_url)?;
+				writeln!(receiver, "</figure>")?;
+			}
+		}
+		Ok(())
+	}
+}
+
+impl Renderable for Ask {
+	fn render<W: Write>(&self, receiver: &mut W) -> Result<()> {
+		write!(receiver, ">[!cohost-ask] ")?;
+
+		if self.anon {
+			write!(receiver, "**Anonymous User** asked:")?;
+		} else if let Some(asking_project) = &self.asking_project {
+			write!(receiver, "[**@{0}**](https://cohost.org/{0}) asked:", asking_project.handle)?;
+		}
+
+		let ask_date = self.sent_at.with_timezone(&Local);
+		writeln!(
+			receiver,
+			" <time datetime=\"{}\">{}</time>",
+			ask_date.to_rfc3339(),
+			ask_date.format_localized("%a, %b %d, %Y at %H:%M", Locale::en_US),
+		)?;
+
+		writeln!(receiver, ">{}", self.content)?;
+
+		Ok(())
+	}
+}
+
+impl Renderable for Block {
+	fn render<W: Write>(&self, receiver: &mut W) -> Result<()> {
+		match self {
+			Block::Markdown { markdown } => markdown.render(receiver),
+			Block::AttachmentRow { attachments } => {
+				for attachment in attachments {
+					attachment.render(receiver)?;
+				}
+				Ok(())
+			}
+			Block::Attachment { attachment } => attachment.render(receiver),
+			Block::Ask { ask } => ask.render(receiver),
+		}
+	}
+}
 
 impl Chost {
-	#[allow(dead_code)]
-	pub(crate) fn generate_markdown(&self) -> Result<String> {
+	pub(crate) fn is_share(&self) -> bool {
+		self.transparent_share_of_post_id.or_else(|| self.share_of_post_id).is_some()
+	}
+
+	pub(crate) fn shared_chost(&self) -> Option<&Chost> {
+		if !self.is_share() {
+			return None;
+		}
+
+		let share_id = self.transparent_share_of_post_id.or_else(|| self.share_of_post_id);
+		if share_id.is_none() {
+			return None;
+		}
+
+		let share_id = share_id.unwrap();
+		self.share_tree.iter().filter(|c| c.post_id == share_id).next()
+	}
+
+	/// Generates a `[!cohost-post]` callout. Generates a `[!cohost-share]` callout instead if `share` is `true`.
+	/// Can be unwrapped safely if `share` is `false`.
+	fn cohost_post(&self, share: bool) -> Option<String> {
 		let mut markdown = String::new();
 
-		// write obsidian front matter
-		write!(&mut markdown, "---")?;
-		write!(&mut markdown, "date: {}", self.published_at.with_timezone(&Local).to_rfc3339())?;
-		write!(&mut markdown, "cohost/users:")?;
-		write!(&mut markdown, "---")?;
+		let publish_date = self.published_at.with_timezone(&Local);
 
-		Ok("".parse().unwrap())
+		let callout = if share { "share" } else { "post" };
+		writeln!(markdown, ">[!cohost-{callout}] {}", self.posting_project.display_name).unwrap();
+		write!(
+			markdown,
+			">@{} <time datetime=\"{}\">{}</time>",
+			self.posting_project.handle,
+			publish_date.to_rfc3339(),
+			publish_date.format_localized("%a, %b %d, %Y at %H:%M", Locale::en_US),
+		).unwrap();
+
+		// ugly double indentation because we can't combine "if let"s and booleans yet
+		if share {
+			if let Some(shared_chost) = self.shared_chost() {
+				write!(
+					markdown,
+					" :LiRefreshCw: **{}** @{}",
+					shared_chost.posting_project.display_name,
+					shared_chost.posting_project.handle,
+				).unwrap();
+			} else {
+				return None;
+			}
+		}
+
+		writeln!(markdown).unwrap();
+
+		Some(markdown)
+	}
+
+	#[allow(dead_code)]
+	pub(crate) fn generate_markdown(&self) -> Result<String> {
+		let mut md = String::new();
+
+		// region write obsidian front matter
+
+		let mut users: IndexSet<String> = indexset! { self.posting_project.handle.clone() };
+		let mut tags: IndexSet<String> = IndexSet::new();
+		for tag in self.tags.clone() {
+			tags.insert(tag);
+		}
+
+		for shared_chost in &self.share_tree {
+			for block in &shared_chost.blocks {
+				match block {
+					Block::Ask { ask } => {
+						if !ask.anon {
+							users.insert(ask.clone().asking_project.unwrap().handle);
+						}
+					}
+					_ => ()
+				}
+			}
+
+			users.insert(shared_chost.clone().posting_project.handle);
+			for tag in shared_chost.tags.clone() {
+				tags.insert(tag);
+			}
+		}
+
+		// write obsidian front matter
+		writeln!(md, "---")?;
+		writeln!(md, "date: {}", self.published_at.with_timezone(&Local).to_rfc3339())?;
+		writeln!(md, "cohost/users:")?;
+
+		for user in users {
+			writeln!(md, "  - {user}")?;
+		}
+
+		if !tags.is_empty() {
+			writeln!(md, "cohost/tags:")?;
+			for tag in tags {
+				writeln!(md, "  - {tag}")?;
+			}
+		}
+
+		writeln!(md, "cohost/original-post: {}", &self.single_post_page_url)?;
+		writeln!(md, "cohost/archived-post: https://web.archive.org/web/*/{}", &self.single_post_page_url)?;
+
+		writeln!(md, "---")?;
+
+		// endregion
+
+		// region write posts
+
+		if let Some(cohost_share) = self.cohost_post(true) {
+			writeln!(md, "{}\n", cohost_share.trim()).unwrap();
+		}
+
+		for tree_chost in self.share_tree.iter().filter(|c| c.transparent_share_of_post_id.is_none()) {
+			let cohost_post = tree_chost.cohost_post(false).unwrap();
+			writeln!(md, "{}\n", cohost_post.trim()).unwrap();
+
+			for block in &tree_chost.blocks {
+				block.render(&mut md)?;
+			}
+		}
+
+		for block in &self.blocks {
+			block.render(&mut md)?;
+		}
+
+		// endregion
+
+		Ok(md)
 	}
 }

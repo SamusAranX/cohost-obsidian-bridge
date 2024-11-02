@@ -11,6 +11,12 @@ pub(crate) struct MoreArgs {
 	pub output: PathBuf,
 }
 
+#[derive(Parser, Debug)]
+pub(crate) struct TestArgs {
+	#[arg(short, help = "The input JSON file")]
+	pub input: PathBuf,
+}
+
 #[derive(Subcommand, Debug)]
 pub(crate) enum Commands {
 	#[command(about = "Uses liked.json as a base")]
@@ -18,6 +24,9 @@ pub(crate) enum Commands {
 
 	#[command(about = "Uses posts.json as a base")]
 	Posts(MoreArgs),
+
+	#[command(about = "Loads a single post from a JSON file to test the parser")]
+	Test(TestArgs),
 }
 
 #[derive(Parser, Debug)]

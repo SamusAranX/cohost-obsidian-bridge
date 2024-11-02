@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use serde_aux::prelude::deserialize_option_number_from_string;
+use serde_aux::prelude::{deserialize_number_from_string, deserialize_option_number_from_string};
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +67,7 @@ pub(crate) struct ContactCardEntry {
 pub(crate) struct PostingProject {
 	pub handle: String,
 	pub display_name: String,
+	/// the profile tagline
 	pub dek: String,
 	pub description: String,
 	#[serde(rename = "avatarURL")]
@@ -87,6 +88,12 @@ pub(crate) struct PostingProject {
 	pub ask_settings: AskSettings,
 	pub frequently_used_tags: Vec<String>,
 	pub contact_card: Vec<ContactCardEntry>,
+
+	// only Option<> because of test data
+	// pub logged_out_post_visibility: Option<Privacy>,
+	// pub ask_settings: Option<AskSettings>,
+	// pub frequently_used_tags: Option<Vec<String>>,
+	// pub contact_card: Option<Vec<ContactCardEntry>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -145,7 +152,8 @@ pub(crate) struct AskingProject {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Ask {
-	pub ask_id: String,
+	#[serde(deserialize_with = "deserialize_number_from_string")]
+	pub ask_id: u64,
 	pub anon: bool,
 	pub logged_in: bool,
 	pub asking_project: Option<AskingProject>,
@@ -198,4 +206,10 @@ pub(crate) struct Chost {
 	pub ast_map: AstMap,
 	#[serde(deserialize_with = "deserialize_option_number_from_string")]
 	pub response_to_ask_id: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ChostContainerTest {
+	items: Vec<Chost>,
 }
