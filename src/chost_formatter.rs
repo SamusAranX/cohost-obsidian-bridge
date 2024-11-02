@@ -20,6 +20,7 @@ pub(crate) trait Renderable {
 impl Renderable for Markdown {
 	fn render<W: Write>(&self, receiver: &mut W) -> Result<()> {
 		writeln!(receiver, "{}", self.content.trim())?;
+		writeln!(receiver)?;
 		Ok(())
 	}
 }
@@ -34,6 +35,7 @@ impl Renderable for Attachment {
 				} else {
 					writeln!(receiver, "![]({})", image.file_url)?;
 				}
+				writeln!(receiver)?;
 			}
 			Attachment::Audio(audio) => {
 				writeln!(receiver, "<figure>")?;
@@ -44,6 +46,7 @@ impl Renderable for Attachment {
 				writeln!(receiver, "\t</figcaption>")?;
 				writeln!(receiver, "\t<a href=\"{}\">Direct Link</a>", audio.file_url)?;
 				writeln!(receiver, "</figure>")?;
+				writeln!(receiver)?;
 			}
 		}
 		Ok(())
@@ -69,6 +72,7 @@ impl Renderable for Ask {
 		)?;
 
 		writeln!(receiver, ">{}", self.content)?;
+		writeln!(receiver)?;
 
 		Ok(())
 	}
@@ -87,6 +91,32 @@ impl Renderable for Block {
 			Block::Attachment { attachment } => attachment.render(receiver),
 			Block::Ask { ask } => ask.render(receiver),
 		}
+	}
+}
+
+impl Renderable for Chost {
+	fn render<W: Write>(&self, receiver: &mut W) -> Result<()> {
+		let callout_post = self.cohost_post(false).unwrap();
+		writeln!(receiver, "{}", callout_post.trim())?;
+		writeln!(receiver)?;
+
+		if !self.headline.is_empty() {
+			writeln!(receiver, "# {}", self.headline)?;
+			writeln!(receiver)?;
+		}
+
+		for block in &self.blocks {
+			block.render(receiver)?;
+		}
+
+		let tags_string = &self.tags.iter().map(|tag| {
+			return format!("#{tag}")
+		}).collect::<Vec<String>>().join(" ");
+
+		writeln!(receiver, "{tags_string}")?;
+		writeln!(receiver)?;
+
+		Ok(())
 	}
 }
 
@@ -161,7 +191,9 @@ impl Chost {
 			for block in &shared_chost.blocks {
 				match block {
 					Block::Ask { ask } => {
-						if !ask.anon {
+						if ask.anon {
+							users.insert("Anonymous User".parse()?);
+						} else {
 							users.insert(ask.clone().asking_project.unwrap().handle);
 						}
 					}
@@ -175,7 +207,7 @@ impl Chost {
 			}
 		}
 
-		// write obsidian front matter
+		// write the actual front matter
 		writeln!(md, "---")?;
 		writeln!(md, "date: {}", self.published_at.with_timezone(&Local).to_rfc3339())?;
 		writeln!(md, "cohost/users:")?;
@@ -200,22 +232,16 @@ impl Chost {
 
 		// region write posts
 
-		if let Some(cohost_share) = self.cohost_post(true) {
-			writeln!(md, "{}\n", cohost_share.trim()).unwrap();
+		if let Some(callout_share) = self.cohost_post(true) {
+			writeln!(md, "{}", callout_share.trim()).unwrap();
+			writeln!(md)?;
 		}
 
 		for tree_chost in self.share_tree.iter().filter(|c| c.transparent_share_of_post_id.is_none()) {
-			let cohost_post = tree_chost.cohost_post(false).unwrap();
-			writeln!(md, "{}\n", cohost_post.trim()).unwrap();
-
-			for block in &tree_chost.blocks {
-				block.render(&mut md)?;
-			}
+			tree_chost.render(&mut md)?;
 		}
 
-		for block in &self.blocks {
-			block.render(&mut md)?;
-		}
+		self.render(&mut md)?;
 
 		// endregion
 
